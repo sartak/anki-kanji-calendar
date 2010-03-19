@@ -8,7 +8,10 @@ use Lingua::JA::Heisig 'kanji', 'heisig_number';
 use autodie;
 use DateTime;
 use Lingua::JP::Kanjidic;
+use DBI;
 my $dic = Lingua::JP::Kanjidic->new("$ENV{HOME}/.kanjidic");
+
+my $anki_db = shift or die "usage: $0 database.anki\n";
 
 my %kanji_for;
 my %learned;
@@ -17,19 +20,24 @@ my $total_learned = 0;
 my $first_rtk1;
 my $first_rtk3;
 my %learned_type;
-
 my ($min_ease, $max_ease) = (2.5, 2.5);
-while (1) {
-    my $english = <>;
+
+my $dbh = DBI->connect("dbi:SQLite:dbname=$anki_db","","");
+my @rows = @{ ($dbh->selectall_arrayref("
+    select facts.created, fields.value, cards.factor, cards.yesCount, cards.noCount from cards join facts on cards.factId = facts.id join fields on fields.factId = facts.id join models on facts.modelId = models.id where models.tags like '%kanji%' and (fields.ordinal=1 or fields.ordinal=0) order by facts.created, fields.ordinal;
+"))[0] };
+
+while (@rows) {
+    my $english = shift @rows;
     last if !defined($english);
-    my $kanji = <>;
+    my $kanji = shift @rows;
     my ($date, $ym, $d);
 
     my ($ease, $right, $wrong);
 
     for ($english, $kanji) {
         chomp;
-        ($date, my ($value), $ease, $right, $wrong) = split '\|', $_;
+        ($date, my ($value), $ease, $right, $wrong) = @$_;
         my @lt = localtime($date);
         $ym = strftime('%Y-%m', @lt);
         $d  = $lt[3];
