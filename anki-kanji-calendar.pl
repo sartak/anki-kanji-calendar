@@ -5,7 +5,6 @@ use Calendar::Calendar;
 use POSIX 'strftime';
 use Encode 'encode_utf8', 'decode_utf8';
 use Lingua::JA::Heisig 'kanji', 'heisig_number';
-use autodie;
 use DateTime;
 use Lingua::JP::Kanjidic;
 use DBI;
