@@ -1,0 +1,7 @@
+Make sure your models that contain kanji have tag "kanji"
+
+This code expects the first field in your kanji model to be the English concept
+name and the second field in the model to be the literal kanji character. If
+that's not the case for you.. feel free to submit a patch against the SQL
+query.
+
