@@ -120,6 +120,7 @@ print <<'EOH';
     </style>
   <body>
     <p title="even this tip" style="font-size: small">(yo, everything has tooltips)</p>
+    <p><a title="if you use it I'd like to see!" href="http://github.com/sartak/anki-kanji-calendar">peep the code</a></p>
 EOH
 
 my $i = 0;
