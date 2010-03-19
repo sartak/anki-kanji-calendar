@@ -10,11 +10,6 @@ use DateTime;
 use Lingua::JP::Kanjidic;
 my $dic = Lingua::JP::Kanjidic->new("$ENV{HOME}/.kanjidic");
 
-#binmode(\*STDOUT, ':utf8');
-
-open my $review_handle, '>', "$ENV{HOME}/devel/homepage/review.txt";
-open my $known_kanji, '>', "$ENV{HOME}/japanese/known-kanji.txt";
-
 my %kanji_for;
 my %learned;
 my $heisig_learned = 0;
@@ -62,8 +57,6 @@ while (1) {
     }
 
     push @{ $kanji_for{$ym}{$d} }, [$kanji, $english, $ease, $right, $wrong];
-    print { $review_handle } "$kanji:$english\n";
-    print { $known_kanji } "$kanji $english\n";
 }
 
 my @dates = sort keys %kanji_for;
