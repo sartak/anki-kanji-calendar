@@ -3,14 +3,12 @@ use strict;
 use warnings;
 use Calendar::Calendar;
 use POSIX 'strftime';
-use Encode 'encode_utf8', 'decode_utf8';
 use Lingua::JA::Heisig 'kanji', 'heisig_number';
 use DateTime;
 use Lingua::JP::Kanjidic;
-use DBI;
+use Anki::Database;
+use utf8::all;
 my $dic = Lingua::JP::Kanjidic->new("$ENV{HOME}/.kanjidic");
-
-my $anki_db = shift or die "usage: $0 database.anki\n";
 
 my %kanji_for;
 my %learned;
@@ -21,38 +19,42 @@ my $first_rtk3;
 my %learned_type;
 my ($min_ease, $max_ease) = (2.5, 2.5);
 
-my $dbh = DBI->connect("dbi:SQLite:dbname=$anki_db","","");
-my @rows = @{ ($dbh->selectall_arrayref("
-    select facts.created, fields.value, cards.factor, cards.yesCount, cards.noCount from cards join facts on cards.factId = facts.id join fields on fields.factId = facts.id join models on facts.modelId = models.id where models.tags like '%kanji%' and (fields.ordinal=1 or fields.ordinal=0) order by facts.created, fields.ordinal;
-"))[0] };
+my $dbh = Anki::Database->new;
+my $sth = $dbh->prepare("
+    select facts.created, english.value, kanji.value, cards.factor, cards.yesCount, cards.noCount
+    from cards
+        join facts on (cards.factId = facts.id)
+        join fields as english on (english.factId = facts.id)
+        join fields as kanji on (kanji.factId = facts.id)
+        join fieldModels as englishFM on (english.fieldModelId = englishFM.id)
+        join fieldModels as kanjiFM on (kanji.fieldModelId = kanjiFM.id)
+        join models on (facts.modelId = models.id)
+        join cardModels on (cardModels.modelId = models.id)
+    where
+        models.name like '%漢字%'
+        and englishFM.name = '英語'
+        and kanjiFM.name = '漢字'
+        and cardModels.name = '書け'
+    group by kanji.value
+    order by facts.created
+;");
+$sth->execute;
 
-while (@rows) {
-    my $english = shift @rows;
-    last if !defined($english);
-    my $kanji = shift @rows;
-    my ($date, $ym, $d);
-
-    my ($ease, $right, $wrong);
-
-    for ($english, $kanji) {
-        chomp;
-        ($date, my ($value), $ease, $right, $wrong) = @$_;
-        my @lt = localtime($date);
-        $ym = strftime('%Y-%m', @lt);
-        $d  = $lt[3];
-        $_ = $value;
-    }
+while (my ($date, $english, $kanji, $ease, $right, $wrong) = $sth->fetchrow_array) {
+    my @lt = localtime($date);
+    my $ym = strftime('%Y-%m', @lt);
+    my $d  = $lt[3];
 
     $min_ease = $ease if $ease < $min_ease;
     $max_ease = $ease if $ease > $max_ease;
 
     ++$learned{$ym};
     ++$total_learned;
-    my $heisig = heisig_number(decode_utf8($kanji));
+    my $heisig = heisig_number($kanji);
     if ($heisig) {
         ++$heisig_learned;
         if ($heisig_learned != $heisig) {
-            warn "You seemed to learn $kanji out of order: It's your #$heisig but Heisig's #$heisig_learned";
+            warn "You seemed to learn $kanji out of order: It's your #$heisig_learned but Heisig's #$heisig";
         }
     }
 
@@ -166,7 +168,7 @@ while (@dates) {
                                 map {
                                     my $meanings = join '/', @{$dic->lookup($_)->{meaning}};
                                     [
-                                        encode_utf8($_),
+                                        $_,
                                         "$meanings (projected)"
                                     ]
                                 }
@@ -176,7 +178,7 @@ while (@dates) {
                         # project for tomorrow, if it wouldn't add a new week
                         elsif ($days[0]) {
                             $kanji_for{$ym}{$days[0]} = [
-                                map { [encode_utf8($_), '(projected)'] }
+                                map { [$_, '(projected)'] }
                                 split '',
                                 substr(kanji(), $heisig_learned, 32)
                             ];
@@ -191,7 +193,7 @@ while (@dates) {
                             $ease ||= 2.5; $right ||= 0; $wrong ||= 0;
                             my $total = $right + $wrong;
                             my $ratio = $total ? sprintf '%i%% %i/%i', int(100 * $right / $total), $right, $total : 'untested';
-                            my $heisig = heisig_number(decode_utf8($kanji));
+                            my $heisig = heisig_number($kanji);
                             my $type = $heisig && $heisig <= 2042 ? 'RTK1'
                                      : $heisig && $heisig > 2042  ? 'RTK3'
                                                                   : 'NH';
