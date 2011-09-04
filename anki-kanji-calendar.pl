@@ -29,13 +29,12 @@ my $sth = $dbh->prepare("
         join fieldModels as englishFM on (english.fieldModelId = englishFM.id)
         join fieldModels as kanjiFM on (kanji.fieldModelId = kanjiFM.id)
         join models on (facts.modelId = models.id)
-        join cardModels on (cardModels.modelId = models.id)
+        join cardModels on (cardModels.id = cards.cardModelId)
     where
         models.name like '%漢字%'
         and englishFM.name = '英語'
         and kanjiFM.name = '漢字'
         and cardModels.name = '書け'
-    group by kanji.value
     order by facts.created
 ;");
 $sth->execute;
